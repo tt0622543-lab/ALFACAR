@@ -37,3 +37,5 @@ jobs:
       - name: Publicar site
         id: deployment
         uses: actions/deploy-pages@v4
+
+# Novo disparo após a configuração do GitHub Pages.
