@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
                     "localStorage.setItem('alfacar-v1',JSON.stringify(db));location.reload();" +
                     "}catch(e){console.error('Falha na recuperação do orçamento Adil',e);}})();";
                 view.evaluateJavascript(migration, null);
+                view.evaluateJavascript("(function(){var s=document.createElement('script');s.src='file:///android_asset/www/cloud-sync.js';document.head.appendChild(s);})();", null);
             }
 
             @Override
