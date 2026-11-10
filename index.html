@@ -76,6 +76,17 @@ let db=JSON.parse(localStorage.getItem('alfacar-v1')||'null')||{clients:[],cars:
 let cur=null,stype='',back='home';
 db.quotes=(db.quotes||[]).map(q=>({...q,status:q.status==='Aprovado'?'Aceito':q.status}));
 db.priceRules=db.priceRules||[];db.appointments=db.appointments||[];db.contacts=db.contacts||[];db.financeEntries=db.financeEntries||[];
+/* Restauração do orçamento do cliente Adil nº 10126 */
+if(!db.quotes.some(q=>String(q.num)==='10126'||(q.client==='Adil'&&q.plate==='RUK7D98'))){
+  db.clients=db.clients||[];
+  if(!db.clients.some(c=>c.name==='Adil')) db.clients.push({id:1,name:'Adil',phone:'',doc:''});
+  db.cars=db.cars||[];
+  if(!db.cars.some(c=>c.plate==='RUK7D98')) db.cars.push({id:1,client:'Adil',model:'Toyota Yaris Sedan',year:'2022/2023',color:'Prata',plate:'RUK7D98',chassis:'9BRBC5F38P8206701'});
+  db.quotes.push({id:1,num:'10126',date:'2026-11-09',status:'Em elaboração',client:'Adil',model:'Toyota Yaris Sedan',year:'2022/2023',color:'Prata',plate:'RUK7D98',chassis:'9BRBC5F38P8206701',items:sample.map(x=>({name:x[0],price:x[1]})),payment:'Pagamento dividido em 50% de entrada, no momento da entrada do veículo na oficina, e 50% restantes na entrega do veículo, após a conclusão dos serviços.',deadline:'Prazo estimado: de 7 a 10 dias, sujeito ao andamento dos serviços e a eventuais necessidades identificadas durante a execução.',paid:0,order:false});
+  db.next=Math.max(Number(db.next)||1,10127);
+  localStorage.setItem('alfacar-v1',JSON.stringify(db));
+}
+
 const $=id=>document.getElementById(id),sum=q=>q.items.reduce((a,x)=>a+(+x.price||0),0);
 function save(){localStorage.setItem('alfacar-v1',JSON.stringify(db));render();if($('calendarGrid')){fillAppointmentLists();renderCalendar()}}
 function go(id){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===id));$('title').textContent=({home:'Painel geral',calendar:'Calendário de agendamentos',quotes:'Orçamentos',orders:'Ordens de serviço',clients:'Clientes',contacts:'Agenda de contatos',notifications:'Notificações',cars:'Veículos',catalog:'Serviços',pricing:'Inteligência de preços',finance:'Financeiro',settings:'Configurações',editor:'Editor de orçamento',document:'Documento ALFACAR',simple:'Cadastro'})[id]||id}
