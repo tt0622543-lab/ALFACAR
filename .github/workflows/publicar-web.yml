@@ -1,0 +1,37 @@
+name: Publicar ALFACAR na web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - '.github/workflows/publicar-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+      - name: Preparar site
+        uses: actions/configure-pages@v5
+      - name: Criar pacote do site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - name: Publicar site
+        id: deployment
+        uses: actions/deploy-pages@v4
