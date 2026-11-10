@@ -5,6 +5,7 @@ on:
     branches: [main, master]
     paths:
       - 'index.html'
+      - 'cloud-sync.js'
       - 'app/**'
       - 'build.gradle'
       - 'settings.gradle'
@@ -32,6 +33,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+
+      - name: Incluir sincronização na nuvem
+        run: cp cloud-sync.js app/src/main/assets/www/cloud-sync.js
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
