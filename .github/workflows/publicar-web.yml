@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'cloud-sync.js'
       - '.github/workflows/publicar-web.yml'
   workflow_dispatch:
 
@@ -30,10 +31,23 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
+      - name: Preparar arquivos com sincronização na nuvem
+        run: |
+          mkdir -p _site
+          cp -R . _site
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('_site/index.html')
+          html = p.read_text(encoding='utf-8')
+          tag = '<script src="cloud-sync.js"></script>'
+          if tag not in html:
+              html = html.replace('</body>', tag + '\\n</body>')
+          p.write_text(html, encoding='utf-8')
+          PY
       - name: Criar pacote do site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
       - name: Publicar site
         id: deployment
         uses: actions/deploy-pages@v4
