@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'html2pdf.bundle.min.js'
       - 'cloud-sync.js'
       - '.github/workflows/publicar-web.yml'
   workflow_dispatch:
