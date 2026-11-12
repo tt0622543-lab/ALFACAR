@@ -90,12 +90,28 @@
 
     function showPanel(session) {
       let panel = document.getElementById("alfacar-cloud-panel");
+      let toggle = document.getElementById("alfacar-cloud-toggle");
+      if (!toggle) {
+        toggle = document.createElement("button");
+        toggle.id = "alfacar-cloud-toggle";
+        toggle.type = "button";
+        toggle.setAttribute("aria-label", "Abrir sincronização ALFACAR");
+        toggle.title = "Sincronização ALFACAR";
+        toggle.textContent = "☁";
+        toggle.style.cssText = "position:fixed;z-index:999998;right:14px;bottom:14px;width:46px;height:46px;border-radius:50%;background:#174575;color:#fff;border:2px solid #fff;box-shadow:0 3px 12px #0003;font:24px Arial;display:flex;align-items:center;justify-content:center;padding:0";
+        document.body.appendChild(toggle);
+        toggle.onclick = () => {
+          const p = document.getElementById("alfacar-cloud-panel");
+          if (p) p.style.display = p.style.display === "none" ? "block" : "none";
+        };
+      }
       if (!panel) {
         panel = document.createElement("div");
         panel.id = "alfacar-cloud-panel";
-        panel.style.cssText = "position:fixed;z-index:999999;right:12px;bottom:12px;width:min(340px,calc(100vw - 24px));background:#fff;border:1px solid #d5dce5;border-radius:12px;box-shadow:0 5px 24px #0002;padding:12px;font:14px Arial;color:#172b4d";
-        panel.innerHTML = '<div style="font-weight:700;margin-bottom:6px">☁️ ALFACAR na nuvem</div><div id="alfacar-cloud-status" style="font-size:12px;color:#475569;margin-bottom:8px">Conecte sua conta para sincronizar</div><div id="alfacar-cloud-auth"><input id="alfacar-cloud-email" type="email" autocomplete="email" placeholder="Seu e-mail" style="box-sizing:border-box;width:100%;padding:9px;margin:3px 0;border:1px solid #cbd5e1;border-radius:7px"><input id="alfacar-cloud-password" type="password" autocomplete="current-password" placeholder="Crie uma senha (mín. 6 caracteres)" style="box-sizing:border-box;width:100%;padding:9px;margin:3px 0;border:1px solid #cbd5e1;border-radius:7px"><div style="display:flex;gap:6px;margin-top:5px"><button id="alfacar-cloud-login" style="flex:1;padding:9px;border:0;border-radius:7px;background:#174575;color:#fff">Entrar</button><button id="alfacar-cloud-signup" style="flex:1;padding:9px;border:0;border-radius:7px;background:#e8eef5;color:#174575">Criar conta</button></div></div><div id="alfacar-cloud-user" style="display:none"><button id="alfacar-cloud-sync" style="padding:8px 10px;border:0;border-radius:7px;background:#174575;color:#fff">Sincronizar agora</button> <button id="alfacar-cloud-out" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#334155">Sair</button></div><div style="font-size:11px;color:#64748b;margin-top:8px">Use a mesma conta no Windows e no Android. Seus dados locais serão mesclados com a nuvem.</div>';
+        panel.style.cssText = "display:none;position:fixed;z-index:999999;right:12px;bottom:70px;width:min(320px,calc(100vw - 24px));max-height:75vh;overflow:auto;background:#fff;border:1px solid #d5dce5;border-radius:12px;box-shadow:0 5px 24px #0003;padding:12px;font:14px Arial;color:#172b4d";
+        panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;font-weight:700;margin-bottom:6px"><span>☁️ ALFACAR na nuvem</span><button id="alfacar-cloud-close" type="button" aria-label="Fechar" style="border:0;background:#eef2f7;color:#334155;border-radius:7px;padding:5px 9px;font-size:18px">×</button></div><div id="alfacar-cloud-status" style="font-size:12px;color:#475569;margin-bottom:8px">Conecte sua conta para sincronizar</div><div id="alfacar-cloud-auth"><input id="alfacar-cloud-email" type="email" autocomplete="email" placeholder="Seu e-mail" style="box-sizing:border-box;width:100%;padding:9px;margin:3px 0;border:1px solid #cbd5e1;border-radius:7px"><input id="alfacar-cloud-password" type="password" autocomplete="current-password" placeholder="Sua senha" style="box-sizing:border-box;width:100%;padding:9px;margin:3px 0;border:1px solid #cbd5e1;border-radius:7px"><div style="display:flex;gap:6px;margin-top:5px"><button id="alfacar-cloud-login" style="flex:1;padding:9px;border:0;border-radius:7px;background:#174575;color:#fff">Entrar</button><button id="alfacar-cloud-signup" style="flex:1;padding:9px;border:0;border-radius:7px;background:#e8eef5;color:#174575">Criar conta</button></div></div><div id="alfacar-cloud-user" style="display:none"><button id="alfacar-cloud-sync" style="padding:8px 10px;border:0;border-radius:7px;background:#174575;color:#fff">Sincronizar agora</button> <button id="alfacar-cloud-out" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#334155">Sair</button></div><div style="font-size:11px;color:#64748b;margin-top:8px">Use a mesma conta no Windows e no Android.</div>';
         document.body.appendChild(panel);
+        document.getElementById("alfacar-cloud-close").onclick = () => { panel.style.display = "none"; };
         document.getElementById("alfacar-cloud-login").onclick = async () => {
           const email = document.getElementById("alfacar-cloud-email").value.trim();
           const password = document.getElementById("alfacar-cloud-password").value;
@@ -115,15 +131,25 @@
           else await afterLogin();
         };
         document.getElementById("alfacar-cloud-sync").onclick = pullAndMerge;
-        document.getElementById("alfacar-cloud-out").onclick = async () => { await client.auth.signOut(); showPanel(null); setStatus("Você saiu da nuvem."); };
+        document.getElementById("alfacar-cloud-out").onclick = async () => {
+          await client.auth.signOut();
+          showPanel(null);
+          setStatus("Você saiu da nuvem.");
+        };
       }
       const auth = document.getElementById("alfacar-cloud-auth");
       const user = document.getElementById("alfacar-cloud-user");
       if (session && session.user) {
-        auth.style.display = "none"; user.style.display = "block";
+        auth.style.display = "none";
+        user.style.display = "block";
+        toggle.style.background = "#168b48";
+        toggle.title = "ALFACAR sincronizado — toque para abrir";
         setStatus("Conectado: " + session.user.email);
       } else {
-        auth.style.display = "block"; user.style.display = "none";
+        auth.style.display = "block";
+        user.style.display = "none";
+        toggle.style.background = "#174575";
+        toggle.title = "ALFACAR sem conta conectada — toque para abrir";
       }
     }
 
