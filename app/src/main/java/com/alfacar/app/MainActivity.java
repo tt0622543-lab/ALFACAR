@@ -1,12 +1,17 @@
 package com.alfacar.app;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.graphics.Color;
 import android.util.Log;
+import android.util.Base64;
 import android.view.Gravity;
 import android.webkit.ConsoleMessage;
 import android.webkit.WebChromeClient;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -15,11 +20,19 @@ import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import androidx.core.content.FileProvider;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 
 public class MainActivity extends Activity {
     private WebView webView;
     private LinearLayout loading;
     private TextView status;
+    private static final int CREATE_PDF_REQUEST = 9101;
+    private byte[] pendingPdfBytes;
+    private String pendingPdfName;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,6 +51,7 @@ public class MainActivity extends Activity {
         settings.setUseWideViewPort(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         webView.setBackgroundColor(Color.WHITE);
+        webView.addJavascriptInterface(new AlfacarAndroidBridge(), "ALFACARAndroid");
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
@@ -55,6 +69,8 @@ public class MainActivity extends Activity {
                     "localStorage.setItem('alfacar-v1',JSON.stringify(db));location.reload();" +
                     "}catch(e){console.error('Falha na recuperação do orçamento Adil',e);}})();";
                 view.evaluateJavascript(migration, null);
+                String nativePdf = "(function(){if(window.__alfacarNativePdfReady)return;window.__alfacarNativePdfReady=true;async function makePdf(mode){try{var q=db.quotes.find(function(x){return x.id===cur;});if(!q){alert('Abra um orçamento primeiro.');return;}var el=document.getElementById('paper');if(!el||!el.innerText.trim()){alert('Não encontrei o documento para gerar o PDF.');return;}if(typeof html2pdf==='undefined'){alert('O gerador de PDF não carregou. Confira a internet e tente novamente.');return;}var filename='ALFACAR_'+(q.order?'OS':'Orcamento')+'_'+String(q.num).replace(/[^a-z0-9_-]/gi,'_')+'.pdf';var caption='Olá, '+(q.client||'tudo bem')+'! Segue em anexo o '+(q.order?'Ordem de Serviço':'orçamento')+' ALFACAR nº '+q.num+'. Valor total: '+fmt(sum(q))+'.';var worker=html2pdf().set({margin:[10,10,10,10],filename:filename,image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(el).toPdf();var dataUri=await worker.output('datauristring');var base64=dataUri.split(',')[1];if(mode==='save')ALFACARAndroid.savePdf(base64,filename);else ALFACARAndroid.sharePdf(base64,filename,caption);}catch(e){console.error('ALFACAR PDF',e);alert('Não foi possível gerar o PDF: '+(e.message||e));}}window.shareWhatsAppPDF=function(){makePdf('share');};window.shareEmail=function(){makePdf('share');};window.print=function(){makePdf('save');};})();";
+                view.evaluateJavascript(nativePdf, null);
                 view.evaluateJavascript("(function(){var s=document.createElement('script');s.src='file:///android_asset/www/cloud-sync.js';document.head.appendChild(s);})();", null);
             }
 
@@ -107,6 +123,79 @@ public class MainActivity extends Activity {
         error.setPadding(32, 32, 32, 32);
         error.setBackgroundColor(Color.WHITE);
         setContentView(error);
+    }
+
+
+    private class AlfacarAndroidBridge {
+        @JavascriptInterface public void savePdf(String base64, String filename) {
+            try {
+                pendingPdfBytes = Base64.decode(base64, Base64.DEFAULT);
+                pendingPdfName = safePdfName(filename);
+                runOnUiThread(() -> {
+                    Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("application/pdf");
+                    intent.putExtra(Intent.EXTRA_TITLE, pendingPdfName);
+                    startActivityForResult(intent, CREATE_PDF_REQUEST);
+                });
+            } catch (Exception e) {
+                Log.e("ALFACAR-PDF", "Falha ao preparar PDF para salvar", e);
+                runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "Não foi possível preparar o PDF.", android.widget.Toast.LENGTH_LONG).show());
+            }
+        }
+        @JavascriptInterface public void sharePdf(String base64, String filename, String caption) {
+            try {
+                byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
+                String safeName = safePdfName(filename);
+                runOnUiThread(() -> {
+                    try {
+                        File dir = new File(getCacheDir(), "shared");
+                        if (!dir.exists() && !dir.mkdirs()) throw new IOException("Não foi possível criar a pasta temporária.");
+                        File file = new File(dir, safeName);
+                        try (FileOutputStream out = new FileOutputStream(file)) { out.write(bytes); }
+                        Uri uri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", file);
+                        Intent send = new Intent(Intent.ACTION_SEND);
+                        send.setType("application/pdf");
+                        send.putExtra(Intent.EXTRA_STREAM, uri);
+                        if (caption != null && !caption.isEmpty()) send.putExtra(Intent.EXTRA_TEXT, caption);
+                        send.setClipData(ClipData.newUri(getContentResolver(), "PDF ALFACAR", uri));
+                        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(send, "Compartilhar PDF ALFACAR"));
+                    } catch (Exception e) {
+                        Log.e("ALFACAR-PDF", "Falha ao compartilhar PDF", e);
+                        android.widget.Toast.makeText(MainActivity.this, "Não foi possível compartilhar o PDF: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) {
+                Log.e("ALFACAR-PDF", "PDF inválido", e);
+                runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "Arquivo PDF inválido.", android.widget.Toast.LENGTH_LONG).show());
+            }
+        }
+    }
+
+    private String safePdfName(String filename) {
+        String name = filename == null ? "ALFACAR_documento.pdf" : filename.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (!name.toLowerCase().endsWith(".pdf")) name += ".pdf";
+        return name;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == CREATE_PDF_REQUEST) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null && pendingPdfBytes != null) {
+                try (OutputStream out = getContentResolver().openOutputStream(data.getData())) {
+                    if (out == null) throw new IOException("Não foi possível abrir o destino escolhido.");
+                    out.write(pendingPdfBytes);
+                    android.widget.Toast.makeText(this, "PDF ALFACAR salvo com sucesso.", android.widget.Toast.LENGTH_LONG).show();
+                } catch (Exception e) {
+                    Log.e("ALFACAR-PDF", "Falha ao salvar PDF", e);
+                    android.widget.Toast.makeText(this, "Erro ao salvar PDF: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+            pendingPdfBytes = null;
+            pendingPdfName = null;
+        }
     }
 
     @Override
