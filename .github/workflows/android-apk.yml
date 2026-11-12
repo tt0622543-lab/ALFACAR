@@ -23,6 +23,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Gerar ícone com a logomarca original ALFACAR
+        run: |
+          python -m pip install --quiet Pillow
+          python - <<'PY'
+          import base64
+          from io import BytesIO
+          from pathlib import Path
+          from PIL import Image
+          raw = base64.b64decode(Path("app/src/main/assets/alfacar-logo.b64").read_text().strip())
+          logo = Image.open(BytesIO(raw)).convert("RGBA")
+          logo.thumbnail((460, 190), Image.Resampling.LANCZOS)
+          canvas = Image.new("RGBA", (512, 512), (255, 255, 255, 255))
+          canvas.alpha_composite(logo, ((512 - logo.width) // 2, (512 - logo.height) // 2))
+          out = Path("app/src/main/res/drawable-nodpi")
+          out.mkdir(parents=True, exist_ok=True)
+          canvas.save(out / "alfacar_logo.png", optimize=True)
+          PY
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
