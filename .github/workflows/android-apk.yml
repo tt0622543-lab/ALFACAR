@@ -5,6 +5,7 @@ on:
     branches: [main, master]
     paths:
       - 'index.html'
+      - 'html2pdf.bundle.min.js'
       - 'cloud-sync.js'
       - 'app/**'
       - 'build.gradle'
@@ -52,8 +53,12 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Incluir sincronização na nuvem
-        run: cp cloud-sync.js app/src/main/assets/www/cloud-sync.js
+      - name: Preparar arquivos locais do aplicativo
+        run: |
+          mkdir -p app/src/main/assets/www
+          cp index.html app/src/main/assets/www/index.html
+          cp html2pdf.bundle.min.js app/src/main/assets/www/html2pdf.bundle.min.js
+          cp cloud-sync.js app/src/main/assets/www/cloud-sync.js
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
